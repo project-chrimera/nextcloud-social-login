@@ -44,6 +44,7 @@ class ProviderService
         'disable_notify_admins',
         'hide_default_login',
         'button_text_wo_prefix',
+        'use_ldap',
     ];
     const DEFAULT_PROVIDERS = [
         'apple',
@@ -419,8 +420,60 @@ class ProviderService
         return $this->login($uid, $profile, $provider.'-');
     }
 
+    private function finishLogin($user, Profile $profile)
+    {
+        $this->userSession->getSession()->regenerateId();
+        $this->userSession->setTokenProvider($this->tokenProvider);
+        $this->userSession->createSessionToken($this->request, $user->getUID(), $user->getUID());
+        $this->userSession->createRememberMeToken($user);
+
+        $token = $this->tokenProvider->getToken($this->userSession->getSession()->getId());
+        if (
+            $this->config->getUserValue($user->getUid(), $this->appName, 'disable_password_confirmation')
+            && defined(IToken::class.'::SCOPE_SKIP_PASSWORD_VALIDATION')
+        ) {
+            $scope = $token->getScopeAsArray();
+            $scope[IToken::SCOPE_SKIP_PASSWORD_VALIDATION] = true;
+            $token->setScope($scope);
+            $this->tokenProvider->updateToken($token);
+       }
+
+        $this->userSession->completeLogin($user, [
+            'loginName' => $user->getUID(),
+            'password' => '', // we don’t have a password
+           'token' => $token,
+        ], false);
+
+        $user->updateLastLoginTimestamp();
+        \OC::$server->get(\OCP\Files\IRootFolder::class)->getUserFolder($user->getUID());
+
+        if ($redirectUrl = $this->session->get('login_redirect_url')) {
+            if (strpos($redirectUrl, '/') === 0) {
+               $redirectUrl = $this->urlGenerator->getAbsoluteURL($redirectUrl);
+            }
+            return new RedirectResponse($redirectUrl);
+        }
+
+       $this->session->set('last-password-confirm', time());
+       return new RedirectResponse($this->urlGenerator->getAbsoluteURL('/'));
+    }
+
     private function login($uid, Profile $profile, $newGroupPrefix = '')
     {
+        if ($this->appConfig->getValueBool($this->appName, 'use_ldap')) {
+          if (empty($profile->email)) {
+             throw new LoginException($this->l->t('No email returned from provider'));
+          }
+
+          $users = $this->userManager->getByEmail($profile->email);
+
+          if (count($users) !== 1) {
+            throw new LoginException($this->l->t('Login failed: no unique user with email %s', [$profile->email]));
+          }
+
+         $user = $users[0];
+         return $this->finishLogin($user, $profile); // delegate to a helper to finish
+        }
         $user = $this->userManager->get($uid);
         if (null === $user) {
             $connectedUid = $this->socialConnect->findUID($uid);

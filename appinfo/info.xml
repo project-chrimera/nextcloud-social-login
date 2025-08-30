@@ -11,9 +11,9 @@
     <namespace>SocialLogin</namespace>
     <category>integration</category>
     <category>social</category>
-    <website>https://github.com/zorn-v/nextcloud-social-login</website>
-    <bugs>https://github.com/zorn-v/nextcloud-social-login/issues</bugs>
-    <repository>https://github.com/zorn-v/nextcloud-social-login</repository>
+    <website>https://github.com/project-chrimera/nextcloud-social-login</website>
+    <bugs>https://github.com/project-chrimera/nextcloud-social-login/issues</bugs>
+    <repository>https://github.com/project-chrimera/nextcloud-social-login</repository>
     <screenshot>https://raw.githubusercontent.com/zorn-v/nextcloud-social-login/master/appinfo/screenshot.png</screenshot>
     <dependencies>
         <nextcloud min-version="29" max-version="99" />
